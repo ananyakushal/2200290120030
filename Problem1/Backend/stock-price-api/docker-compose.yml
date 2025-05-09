@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  stock-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: stock-aggregation-api
+    environment:
+      - NODE_ENV=production
+      - PORT=300
+      - STOCK_API_URL=http://stock-exchange-mock:4000
+      # Cache settings
+      - SHORT_CACHE_TTL=10
+      - MEDIUM_CACHE_TTL=60
+      - LONG_CACHE_TTL=300
+      # Rate limiting
+      - RATE_LIMIT_WINDOW=900000
+      - RATE_LIMIT_MAX=100
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - stock-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Mock server for local development
+  stock-exchange-mock:
+    image: node:18-alpine
+    container_name: stock-exchange-mock
+    working_dir: /app
+    volumes:
+      - ./mock-server:/app
+    command: sh -c "npm install && npm start"
+    ports:
+      - "4000:4000"
+    networks:
+      - stock-network
+
+networks:
+  stock-network:
+    driver: bridge
